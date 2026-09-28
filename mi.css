@@ -1,0 +1,176 @@
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+        ::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
+        .task-item { transition: all .2s ease; }
+        .task-item:hover { transform: translateX(2px); }
+        .task-completed .task-text { text-decoration: line-through; color:#94a3b8; }
+        .progress-ring__circle { transition: stroke-dashoffset .6s ease; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .progress-bar-fill { transition: width .6s ease; }
+        .card-hover:hover { box-shadow: 0 10px 25px rgba(0,0,0,.06); }
+        .home-workspace-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.25rem; align-items:stretch; }
+        .home-timer-card, .home-daily-card { min-height:15rem; }
+        @media(max-width:600px){ .home-workspace-grid { grid-template-columns:1fr; } }
+        .year-grid { min-width:760px; font-size:11px; color:#475569; }
+        .year-grid-row { display:grid; grid-template-columns:3.5rem repeat(12,minmax(4.2rem,1fr)); }
+        .year-grid-header { position:sticky; top:0; z-index:2; background:#f8fafc; }
+        .year-grid-day-label, .year-grid-month, .year-grid-cell { min-height:2.35rem; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; }
+        .year-grid-day-label { background:#f8fafc; color:#94a3b8; font-weight:600; }
+        .year-grid-month { min-height:2.5rem; color:#475569; font-weight:600; }
+        .year-grid-cell { background:#fff; padding:2px; }
+        .year-grid-input { width:100%; height:100%; min-height:2rem; border:0; outline:0; background:transparent; color:#334155; text-align:center; font-size:10px; }
+        .year-grid-input::placeholder { color:#cbd5e1; }
+        .year-grid-input:focus { background:#f0f9ff; box-shadow:inset 0 0 0 2px #7dd3fc; }
+        .year-grid-cell-empty { color:#cbd5e1; background:#f8fafc; }
+        .year-grid-cell-today { outline:2px solid #0ea5e9; outline-offset:-2px; background:#f0f9ff; }
+        .modal-enter { animation: fadeIn .2s ease; }
+        @keyframes fadeIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .input-focus:focus { outline:none; border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.1); }
+        #weeklyPlanSaveBtn { background:#0ea5e9; color:#fff; border:0; cursor:pointer; }
+        #weeklyPlanSaveBtn:hover { background:#0284c7; }
+        .week-bar { transition: height .5s ease, background .3s ease; }
+        .task-section { max-height:0; overflow:hidden; transition: max-height .4s ease; }
+        .task-section.expanded { max-height:3000px; }
+        .timer-display { font-variant-numeric: tabular-nums; }
+        /* 视图切换 */
+        .view { display:none; }
+        .view.view-active { display:block; animation: fadeIn .25s ease; }
+        /* ===== 防白屏机制：即便 JS 完全崩溃不执行，总览页仍会先显示出来 ===== */
+        #view-home { display:block !important; }
+        /* JS 接管后通过 .js-ready 类覆盖默认，再按 view-active 精准控制 */
+        body.js-ready #view-home { display:none !important; }
+        body.js-ready #view-home.view-active { display:block !important; }
+        /* 侧边栏导航项激活态 */
+        .nav-item-active { background:linear-gradient(135deg,#0ea5e9 0%,#0284c7 100%); color:#fff; box-shadow:0 4px 12px rgba(14,165,233,.3); }
+        /* 侧边栏折叠态 */
+        .sidebar-collapsed .nav-label { display:none; }
+        .sidebar-collapsed .nav-item { justify-content:center; }
+        .sidebar-collapsed .sidebar-header-text { display:none; }
+        .sidebar-collapsed .user-area-collapsible { display:none; }
+        @media(min-width:1024px){
+            #sidebar { position:relative; inset:auto; width:240px; flex:0 0 240px; transform:none; transition:width .3s ease, flex-basis .3s ease; }
+            #sidebar.sidebar-collapsed { width:64px; flex-basis:64px; }
+            #view-home, #view-planning, #view-review, #view-subjects { margin-left:0; }
+        }
+        /* 日历格子 */
+        .cal-cell { transition: all .2s ease; }
+        .cal-cell:hover { transform: scale(1.05); }
+        /* 移动端遮罩 */
+        .sidebar-overlay { transition: opacity .3s ease; }
+        /* 每周复盘：统计标签页 */
+        .stats-tab { color:#64748b; transition:all .2s; }
+        .stats-tab.stats-tab-active { background:#fff; color:#0284c7; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+        /* 每周复盘：拖拽框选高亮 */
+        .week-cell.drag-selected { background:rgba(14,165,233,.18) !important; }
+        .week-grid-layout { column-gap:0 !important; row-gap:0 !important; }
+        .week-cell { border-radius:0 !important; border-style:solid !important; border-color:rgba(148,163,184,.28) !important; }
+        .week-cell-has-entry { overflow:visible !important; position:relative; z-index:2; }
+        .week-cell-has-entry .week-entry { z-index:3; }
+        .week-grid-surface { position:relative; --week-row-height:3.5rem; border-radius:.75rem; overflow:hidden; }
+        .week-grid-surface { user-select:none; -webkit-user-select:none; }
+        .week-grid-overlay { position:absolute; left:3rem; right:0; top:2.25rem; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); pointer-events:none; z-index:5; }
+        .week-day-lane { position:relative; min-width:0; pointer-events:none; }
+        .week-day-lane .week-entry { pointer-events:auto; }
+        .week-drag-preview { position:absolute; left:0; right:0; background:rgba(14,165,233,.28); border:1px solid rgba(14,165,233,.55); border-radius:.375rem; pointer-events:none; z-index:10; }
+        .week-entry-content { display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; color:rgba(255,255,255,.86); font-weight:400; }
+        .week-entry.completed-entry .week-entry-content { color:#475569; }
+        .week-entry-drag-ghost { position:absolute; z-index:1000; pointer-events:none; opacity:.86; box-sizing:border-box; }
+        .week-entry.completed-entry { cursor:not-allowed !important; }
+        .week-entry:not(.completed-entry) { cursor:move; touch-action:none; }
+        .week-entry-drag-ghost .week-entry-content { pointer-events:none; }
+        /* 每周复盘：条目淡入 */
+        .week-entry { animation: fadeIn .2s ease; }
+        /* 计划体系：树形层级缩进 */
+        .tree-node { animation: fadeIn .2s ease; }
+        .tree-children { overflow:hidden; max-height:0; transition: max-height .4s ease; }
+        .tree-children.tree-expanded { max-height:5000px; }
+        /* 数据复盘：标签页 */
+        .review-tab { color:#64748b; transition:all .2s; }
+        .review-tab.review-tab-active { background:#fff; color:#0284c7; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+        /* 计划体系：主线/支线标签 */
+        .planning-tab { color:#64748b; transition:all .2s; border-bottom:2px solid transparent; }
+        .planning-tab.planning-tab-active { color:#0284c7; border-color:#0284c7; font-weight:600; }
+        /* 计时中心：专注模式（隐藏辅助元素，放大计时数字） */
+        .timer-focus .timer-aux { display:none; }
+        .timer-focus .timer-display { font-size:clamp(4rem, 14vw, 9rem); line-height:1.1; }
+        .timer-focus .timer-config-row { display:none; }
+        .timer-focus .timer-stage { display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:60vh; }
+        .timer-config-panel { transform:translateX(100%); transition:transform .3s ease; }
+        .timer-config-panel.panel-open { transform:translateX(0); }
+        /* 滑入面板通用 */
+        .slide-panel { transform:translateX(100%); transition:transform .3s ease; }
+        .slide-panel.panel-open { transform:translateX(0); }
+        /* 计时全屏极简模式 */
+        .timer-fullscreen {
+            position: fixed !important; inset: 0; z-index: 100;
+            background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%);
+            border-radius: 0 !important; padding: 2rem !important;
+        }
+        .timer-fullscreen .timer-display { color:#fff !important; font-size:clamp(5rem, 18vw, 12rem) !important; }
+        .timer-fullscreen .timer-aux { display:none !important; }
+        .timer-fullscreen .timer-status { color:rgba(255,255,255,.7) !important; }
+        /* 计时悬浮窗 */
+        .timer-float {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 90;
+            background: #fff; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,.15);
+            padding: 0.75rem; width: 12rem; border: 1px solid #e2e8f0;
+            transition: all .3s ease;
+        }
+        .timer-float:hover { transform: translateY(-2px); }
+        .timer-float-minimized { width: 5rem; padding: 0.5rem; }
+        /* 加成效果卡片发光 */
+        .bonus-glow { box-shadow: 0 0 20px rgba(251, 191, 36, .2); }
+        /* ===== 关键兜底CSS：即使Tailwind完全加载失败，页面仍可用 ===== */
+        html, body { margin:0; padding:0; min-height:100vh; background: linear-gradient(135deg,#f8fafc,#e0f2fe); font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:#334155; }
+        #sidebar { position:fixed; top:0; left:0; bottom:0; width:240px; background:#fff; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; z-index:50; transform:translateX(-100%); }
+        @media(min-width:1024px){ #sidebar { transform:translateX(0); } }
+        .sidebar-hidden { display:none !important; }
+        #view-home, #view-planning, #view-review, #view-subjects { padding:24px; min-height:100vh; }
+        @media(min-width:1024px){ #view-home, #view-planning, #view-review, #view-subjects, #view-dailyDetail, #view-timer { margin-left:0; min-width:0; } }
+        .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:16px; }
+        .btn-primary { background:#0ea5e9; color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:14px; }
+        .btn-primary:hover { background:#0284c7; }
+        .input-basic { width:100%; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; font-size:14px; box-sizing:border-box; }
+        .nav-item-critical { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px; font-size:14px; color:#475569; cursor:pointer; border:none; background:none; width:100%; text-align:left; }
+        .nav-item-critical:hover { background:#f1f5f9; }
+        .hidden { display:none !important; }
+        .app-shell { display:flex; min-height:100vh; width:100%; overflow-x:hidden; }
+        .app-content { flex:1 1 auto; min-width:0; width:0; overflow-x:hidden; }
+        .entertainment-cover { aspect-ratio:3/4; object-fit:cover; }
+        .entertainment-card { transition:transform .2s ease, box-shadow .2s ease; }
+        .entertainment-card:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.1); }
+        .entertainment-kind-card { aspect-ratio:6/7; transition:transform .2s ease, box-shadow .2s ease; }
+        .entertainment-kind-card:hover { transform:translateY(-3px) rotate(-1deg); box-shadow:0 14px 28px rgba(15,23,42,.12); }
+        .entertainment-kind-card:nth-child(3n+2) { transform:rotate(1deg); }
+        .entertainment-kind-card:nth-child(3n+2):hover { transform:translateY(-3px) rotate(0deg); }
+        .entertainment-kind-title { font-family:"Comic Sans MS","Microsoft YaHei",cursive; }
+        .entertainment-blur-layer { filter:blur(5px); pointer-events:none; user-select:none; }
+        @media(min-width:1024px){
+            #sidebar { position:relative; inset:auto; width:240px; flex:0 0 240px; transform:none; transition:width .3s ease, flex-basis .3s ease; }
+            #sidebar.sidebar-collapsed { width:64px; flex-basis:64px; }
+            #view-home, #view-planning, #view-review, #view-subjects, #view-dailyDetail, #view-timer { margin-left:0; min-width:0; }
+        }
+
+/* Extracted inline styles */
+[data-style-class="extractedStyle1"] {display:none; position:sticky; top:0; z-index:9999; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:12px; line-height:1.6; box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+[data-style-class="extractedStyle2"] {display:block}
+[data-style-class="extractedStyle3"] {width:0%}
+[data-style-class="extractedStyle4"] {height:200px}
+[data-style-class="extractedStyle5"] {height:220px}
+[data-style-class="extractedStyle6"] {height:180px}
+[data-style-class="extractedStyle7"] {display:flex;}
+[data-style-class="extractedStyle8"] {background:#fff;border-radius:16px;padding:24px;width:100%;max-width:384px;}
+[data-style-class="extractedStyle9"] {width:56px;height:56px;margin:auto;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#0284c7);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:20px;margin-bottom:8px;}
+[data-style-class="extractedStyle10"] {font-size:18px;font-weight:600;color:#1e293b;}
+[data-style-class="extractedStyle11"] {font-size:12px;color:#94a3b8;margin-top:4px;}
+[data-style-class="extractedStyle12"] {margin-top:8px;font-size:11px;color:#f59e0b;}
+[data-style-class="extractedStyle13"] {font-size:12px;color:#94a3b8;margin-bottom:4px;display:block;}
+[data-style-class="extractedStyle14"] {width:100%;padding:8px 12px;font-size:14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;}
+[data-style-class="extractedStyle15"] {font-size:12px;color:#94a3b8;margin-bottom:4px;display:block;}
+[data-style-class="extractedStyle16"] {width:100%;padding:8px 12px;font-size:14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;}
+[data-style-class="extractedStyle17"] {font-size:12px;color:#ef4444;}
+[data-style-class="extractedStyle18"] {width:100%;background:#0ea5e9;color:#fff;padding:10px;border-radius:8px;font-size:14px;font-weight:500;border:none;cursor:pointer;}
+[data-style-class="extractedStyle19"] {display:flex;justify-content:center;gap:12px;font-size:12px;}
+[data-style-class="extractedStyle20"] {color:#0284c7;font-weight:500;background:none;border:none;cursor:pointer;}
+[data-style-class="extractedStyle21"] {color:#cbd5e1;}
+[data-style-class="extractedStyle22"] {color:#94a3b8;background:none;border:none;cursor:pointer;}

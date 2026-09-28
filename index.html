@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习进度管理系统</title>
+    <script src="vendor/tailwindcss.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/mi.js"></script>
+    <script src="js/km.js"></script>
+    <script src="js/sy.js"></script>
+    <script src="vendor/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="mi.css">
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen font-sans text-slate-700">
+
+<div class="app-shell flex min-h-screen">
+    <!-- ========== 左侧固定可折叠侧边栏 ========== -->
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-60 bg-white border-r border-slate-200 flex flex-col -translate-x-full lg:translate-x-0 transition-transform duration-300">
+        <!-- 侧边栏顶部：用户头像 + 用户名区域（点击打开个人面板） -->
+        <div id="sidebarUserArea" class="p-4 border-b border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition" onclick="openPersonalPanel()">
+            <!-- 用户头像 -->
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0" id="sidebarAvatar">
+                学
+            </div>
+            <div class="user-area-collapsible flex-1 min-w-0">
+                <div id="sidebarUsername" class="text-sm font-semibold text-slate-800 truncate">学习者</div>
+                <div id="sidebarLoginStatus" class="text-[10px] text-slate-400 truncate">未登录</div>
+            </div>
+            <span class="user-area-collapsible text-slate-300 text-xs">›</span>
+        </div>
+        <!-- 退出登录按钮（登录后显示） -->
+        <button id="logoutBtn" onclick="logout()" class="hidden mx-3 mt-2 mb-1 px-3 py-1.5 text-xs text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition border border-slate-100">退出登录</button>
+
+        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+            <span class="text-xl">📚</span>
+            <span class="sidebar-header-text font-bold text-slate-800 text-sm">学习管理</span>
+            <!-- 桌面端折叠按钮 -->
+            <button onclick="toggleSidebarCollapse()" class="ml-auto text-slate-400 hover:text-slate-600 text-sm flex-shrink-0" title="收起或展开侧边栏" aria-label="收起或展开侧边栏">◀▶</button>
+            <!-- 移动端关闭 -->
+            <button onclick="closeSidebarMobile()" class="ml-auto lg:hidden text-slate-400 hover:text-slate-600 text-lg">✕</button>
+        </div>
+        <nav class="flex-1 p-2 space-y-1 overflow-y-auto">
+            <!-- 一级导航精简为4项：总览、计划体系、数据复盘、学科管理 -->
+            <button onclick="switchView('home')" data-view="home" class="nav-item nav-label w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span class="text-lg">🏠</span><span class="nav-label">总览</span>
+            </button>
+            <button onclick="switchView('planning')" data-view="planning" class="nav-item nav-label w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span class="text-lg">🎯</span><span class="nav-label">计划体系</span>
+            </button>
+            <button onclick="switchView('review')" data-view="review" class="nav-item nav-label w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span class="text-lg">📊</span><span class="nav-label">数据复盘</span>
+            </button>
+            <button onclick="switchView('subjects')" data-view="subjects" class="nav-item nav-label w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span class="text-lg">🗂️</span><span class="nav-label">学科管理</span>
+            </button>
+            <button onclick="switchView('entertainment')" data-view="entertainment" class="nav-item nav-label w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span class="text-lg">🎬</span><span class="nav-label">娱乐</span>
+            </button>
+        </nav>
+        <div class="nav-label p-3 border-t border-slate-100 text-[10px] text-slate-400 text-center">数据本地持久化保存</div>
+    </aside>
+    <!-- 移动端遮罩 -->
+    <div id="sidebarOverlay" class="sidebar-overlay fixed inset-0 bg-black/40 z-40 hidden lg:hidden" onclick="closeSidebarMobile()"></div>
+
+    <!-- ========== 主内容区 ========== -->
+    <div class="app-content flex-1 min-w-0 flex flex-col">
+        <!-- 移动端顶栏 -->
+        <header class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
+            <button onclick="openSidebarMobile()" class="text-slate-600 text-xl">☰</button>
+            <span class="font-semibold text-slate-800" id="mobileTitle">总览</span>
+        </header>
+
+        <main class="flex-1 min-w-0 p-4 lg:p-6 w-full">
+            <!-- 全局初始化错误提示（空白页排查利器：如有JS异常会显示具体错误信息） -->
+            <div id="initErrorTip" style="display:none; position:sticky; top:0; z-index:9999; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:12px; line-height:1.6; box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+
+        <!-- ===== 视图1：总览（原首页更名，游戏式轻量化主界面） ===== -->
+        <!-- 内联 display:block 是终极防白屏：就算整段 JS 崩溃不执行，总览页也能先显示；JS一接管就会移除这个内联样式，重新按 view-active 控制 -->
+        <section id="view-home" class="view space-y-5" style="display:block">
+            <!-- 顶部核心区域：用户信息 + 全局大目标环形进度盘 -->
+            <div class="relative bg-gradient-to-br from-indigo-500 via-primary-500 to-blue-500 rounded-3xl p-6 text-white shadow-lg overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full"></div>
+                <div class="absolute -bottom-14 -left-14 w-52 h-52 bg-white/5 rounded-full"></div>
+                <div class="relative flex items-center justify-between flex-wrap gap-4">
+                    <div class="flex-1 min-w-[160px]">
+                        <div class="flex items-center gap-3 mb-2">
+                            <!-- 用户头像入口 -->
+                            <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white font-bold text-lg cursor-pointer hover:bg-white/30 transition shadow" onclick="openPersonalPanel()" id="homeAvatarEntry">
+                                学
+                            </div>
+                            <div>
+                                <p class="text-xs text-white/70">欢迎回来</p>
+                                <h2 id="homeUsername" class="text-xl font-bold cursor-text" onclick="editUsername()" title="点击设置用户名">学习者</h2>
+                            </div>
+                        </div>
+                        <!-- 个人面板入口 -->
+                        <button onclick="openPersonalPanel()" class="mt-2 inline-flex items-center gap-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition">
+                            <span>👤</span> 查看个人面板 →
+                        </button>
+                    </div>
+                    <!-- 全局大目标环形进度盘 -->
+                    <div class="relative w-28 h-28 flex-shrink-0">
+                        <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="10"/>
+                            <circle id="goalRing" class="progress-ring__circle" cx="60" cy="60" r="50" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="goalRingPercent" class="text-2xl font-bold">0%</span>
+                            <span class="text-[10px] text-white/70">总进度</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="home-workspace-grid">
+                <!-- 左侧：计时中心 -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm card-hover home-timer-card">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><span>⏱️</span>计时</h3>
+                        <button onclick="switchView('timer')" class="text-xs text-primary-600 hover:text-primary-700">详情 →</button>
+                    </div>
+                    <div id="homeTimerDisplay" class="timer-display text-4xl md:text-5xl font-bold text-primary-600 tabular-nums text-center py-5">00:00:00</div>
+                    <div class="text-center text-xs text-slate-400 mb-4">今日学习时长：<span id="homeTimerTodayTime" class="font-semibold text-primary-600">0m</span></div>
+                    <button onclick="quickStartStudy()" class="w-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl p-3 shadow-lg transition active:scale-95">
+                        <span class="font-semibold">▶ 开始学习</span>
+                    </button>
+                </div>
+
+                <!-- 右侧：日常任务 -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm card-hover cursor-pointer home-daily-card" onclick="switchView('dailyDetail')">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><span>☀️</span><span>日常</span><span class="text-[10px] text-slate-400 font-normal">（每日任务）</span></h3>
+                        <div class="flex items-center gap-2"><span id="homeDoneCount" class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full">完成 0/0</span><span id="homeTodayPercent" class="text-xs font-semibold text-primary-600 bg-primary-50 px-2.5 py-0.5 rounded-full">0%</span></div>
+                    </div>
+                    <div id="homeMiniTaskList" class="space-y-2"></div>
+                    <div id="homeMiniTaskEmpty" class="hidden text-center py-6 text-slate-300 text-sm"><div class="text-3xl mb-2">🌼</div>今日暂无日常任务</div>
+                    <button onclick="event.stopPropagation();quickAddTask()" class="w-full text-xs text-slate-500 hover:text-primary-600 transition py-2 mt-2">+ 快速添加日常任务</button>
+                </div>
+            </div>
+
+            <!-- 隐藏输入同步 -->
+            <input id="usernameInput" type="hidden" oninput="onUsernameChange(this.value)">
+            <textarea id="goalInput" rows="2" class="hidden" oninput="onGoalChange(this.value)"></textarea>
+        </section>
+
+        <!-- ===== 视图：日常详情页（独立完整任务列表页，支持日期切换与提前设置） ===== -->
+        <section id="view-dailyDetail" class="view space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <button onclick="switchView('home')" class="text-slate-400 hover:text-slate-600 text-sm">← 返回总览</button>
+                    <h2 class="text-xl font-bold text-slate-800">日常详情</h2>
+                </div>
+                <!-- 日期切换器：支持提前设置未来日期任务 -->
+                <div class="flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-sm">
+                    <button onclick="changeDailyDate(-1)" class="text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition">‹</button>
+                    <input type="date" id="dailyDatePicker" onchange="onDailyDateChange(this.value)" class="input-focus px-2 py-1 text-sm border border-slate-200 rounded-lg bg-slate-50">
+                    <button onclick="changeDailyDate(1)" class="text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition">›</button>
+                    <button onclick="goDailyToday()" class="text-xs bg-primary-50 text-primary-600 px-2 py-1 rounded-lg hover:bg-primary-100 transition">今天</button>
+                </div>
+            </div>
+            <!-- 每日完成率统计卡 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="bg-white rounded-2xl p-4 shadow-sm">
+                    <div class="text-xs text-slate-400 mb-1">待办任务</div>
+                    <div class="text-2xl font-bold text-slate-800"><span id="ddTodoCount">0</span><span class="text-sm text-slate-400 ml-1">条</span></div>
+                </div>
+                <div class="bg-white rounded-2xl p-4 shadow-sm">
+                    <div class="text-xs text-slate-400 mb-1">已完成</div>
+                    <div class="text-2xl font-bold text-emerald-600"><span id="ddDoneCount">0</span><span class="text-sm text-slate-400 ml-1">条</span></div>
+                </div>
+                <div class="bg-white rounded-2xl p-4 shadow-sm">
+                    <div class="text-xs text-slate-400 mb-1">完成率</div>
+                    <div class="text-2xl font-bold text-primary-600"><span id="ddPercent">0</span><span class="text-sm text-slate-400 ml-1">%</span></div>
+                </div>
+            </div>
+            <!-- 新增任务输入栏 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+                <div class="flex gap-2 flex-wrap">
+                    <input id="ddTaskInput" type="text" placeholder="新增日常任务（命中关键词自动+1子模块）"
+                        class="input-focus flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"
+                        onkeypress="if(event.key==='Enter') addDatedGlobalTask()">
+                    <select id="ddSubjectSelect" class="input-focus px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+                        <option value="">自由任务</option>
+                    </select>
+                    <button onclick="addDatedGlobalTask()" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ 添加</button>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">💡 可切换日期提前设置未来的日常任务</p>
+            </div>
+            <!-- 待办列表 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-semibold text-slate-600 flex items-center gap-1"><span>📌</span> 待办</h4>
+                    <span id="ddTodoBadge" class="text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">0</span>
+                </div>
+                <div id="ddTodoList" class="space-y-1.5"></div>
+                <div id="ddTodoEmpty" class="hidden text-center py-6 text-slate-300 text-sm">🎉 暂无待办，享受当下</div>
+            </div>
+            <!-- 已完成列表 -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <h4 class="text-sm font-semibold text-slate-600 flex items-center gap-1"><span>📦</span> 已完成</h4>
+                    <div class="flex items-center gap-1.5">
+                        <span id="ddDoneBadge" class="text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">0</span>
+                        <button onclick="clearDatedDone()" class="text-[11px] text-slate-400 hover:text-red-500 px-1.5 py-0.5">清空</button>
+                    </div>
+                </div>
+                <div id="ddDoneList" class="space-y-1.5 max-h-80 overflow-y-auto"></div>
+                <div id="ddDoneEmpty" class="hidden text-center py-6 text-slate-300 text-sm">🍼 还没有完成的任务</div>
+            </div>
+        </section>
+
+        <!-- ===== 视图2：计划体系（主线/支线二级标签，多层级管理） ===== -->
+        <section id="view-planning" class="view space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <h2 class="text-xl font-bold text-slate-800">计划体系</h2>
+                <span class="text-xs text-slate-400">主线对标大目标；支线独立自由管理</span>
+            </div>
+            <!-- 二级标签：主线 / 支线 -->
+            <div class="border-b border-slate-200">
+                <div class="flex gap-4">
+                    <button onclick="switchPlanningTab('main')" id="planningTabMain" class="planning-tab planning-tab-active px-1 py-2 text-sm">主线</button>
+                    <button onclick="switchPlanningTab('side')" id="planningTabSide" class="planning-tab px-1 py-2 text-sm">支线</button>
+                </div>
+            </div>
+
+            <!-- 主线标签页内容 -->
+            <div id="planningPane-main" class="planning-pane space-y-3">
+                <!-- 主线任务列表（多条，对标原整体大目标） -->
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><span>🌟</span> 主线任务</h3>
+                    <button onclick="openAddMainLineModal()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">+ 新建主线</button>
+                </div>
+                <div id="mainLineList" class="space-y-3"></div>
+                <div id="mainLineEmpty" class="hidden text-center py-10 text-slate-300 bg-white rounded-2xl shadow-sm">
+                    <div class="text-5xl mb-3">🚀</div><p class="text-sm">还没有主线任务，点击「新建主线」创建你的第一个大目标</p>
+                </div>
+            </div>
+
+            <!-- 支线标签页内容（v7 重写：对齐主线结构 UI，主色 teal-emerald 系） -->
+            <div id="planningPane-side" class="planning-pane space-y-3 hidden">
+                <!-- 支线任务列表（结构与主线完全一致） -->
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><span>🎭</span> 支线任务</h3>
+                    <button onclick="openAddSideLineModal()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">+ 新建支线</button>
+                </div>
+                <div id="sideLineList" class="space-y-3"></div>
+                <div id="sideLineEmpty" class="hidden text-center py-10 text-slate-300 bg-white rounded-2xl shadow-sm">
+                    <div class="text-5xl mb-3">🌿</div><p class="text-sm">还没有支线任务，点击「新建支线」创建独立自由的子目标</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 视图3：计时中心（双状态+全屏极简+悬浮窗+补录+修改） ===== -->
+        <section id="view-timer" class="view space-y-6">
+            <h2 class="text-xl font-bold text-slate-800 timer-aux">计时中心</h2>
+
+            <!-- 主计时舞台 -->
+            <div id="timerStage" class="timer-stage bg-white rounded-2xl p-5 shadow-sm relative transition-all duration-500">
+                <!-- 右上角：设置/专注/全屏/悬浮 -->
+                <div class="absolute top-3 right-3 flex items-center gap-2 z-10">
+                    <button onclick="toggleTimerConfigPanel()" title="计时设置/补录" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition timer-aux">
+                        <span class="text-base">⚙</span>
+                    </button>
+                    <button onclick="enterTimerFocus()" title="专注模式" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition timer-aux" id="enterFocusBtn">
+                        <span class="text-base">⛶</span>
+                    </button>
+                    <button onclick="exitTimerFocus()" title="退出专注" class="hidden w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition" id="exitFocusBtn">
+                        <span class="text-base">✕</span>
+                    </button>
+                    <button onclick="toggleTimerFloatWindow()" title="悬浮窗模式" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition timer-aux">
+                        <span class="text-base">📌</span>
+                    </button>
+                </div>
+
+                <!-- 超大计时数字 -->
+                <div class="text-center py-10 md:py-14">
+                    <div id="timerDisplay" class="timer-display text-5xl md:text-7xl font-bold text-primary-600 tabular-nums">00:00:00</div>
+                    <div id="timerStatus" class="mt-2 text-xs text-slate-400">未开始</div>
+                </div>
+
+                <!-- 开始/暂停/停止按钮 -->
+                <div class="grid grid-cols-3 gap-2 max-w-md mx-auto">
+                    <button id="timerStartBtn" onclick="startTimer()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm py-3 rounded-xl transition">开始</button>
+                    <button id="timerPauseBtn" onclick="pauseTimer()" class="bg-amber-500 hover:bg-amber-600 text-white text-sm py-3 rounded-xl transition disabled:opacity-40" disabled>暂停</button>
+                    <button id="timerStopBtn" onclick="stopTimer()" class="bg-red-500 hover:bg-red-600 text-white text-sm py-3 rounded-xl transition disabled:opacity-40" disabled>停止</button>
+                </div>
+
+                <!-- 底部直接切换计时所属学科 -->
+                <div class="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
+                    <label for="timerSubjectBottom">当前学科</label>
+                    <select id="timerSubjectBottom" onchange="onTimerSubjectChange('timerSubjectBottom');updateTimerCurrentLabel()" class="input-focus px-2 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-600"></select>
+                </div>
+            </div>
+
+            <!-- 侧边滑出配置面板（学科、补录、记录修改、历史） -->
+            <div id="timerConfigPanel" class="timer-config-panel fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-40 overflow-y-auto p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-semibold text-slate-800">计时设置</h3>
+                    <button onclick="toggleTimerConfigPanel()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+                </div>
+                <!-- 学科选择（v9b 移除二级分类，只保留学科） -->
+                <div class="space-y-3 mb-4">
+                    <div>
+                        <label class="text-xs text-slate-400 mb-1 block">学科</label>
+                        <select id="timerSubject" onchange="onTimerSubjectChange();updateTimerCurrentLabel()" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select>
+                    </div>
+                </div>
+                <!-- 手动补录计时记录 -->
+                <div class="pt-4 border-t border-slate-100 mb-4">
+                    <h4 class="text-xs font-semibold text-slate-600 mb-3 flex items-center gap-1"><span>➕</span> 手动补录计时</h4>
+                    <div class="space-y-2 bg-slate-50 rounded-lg p-3">
+                        <div>
+                            <label class="text-[10px] text-slate-400">日期</label>
+                            <input type="date" id="manualRecordDate" class="input-focus w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400">开始时间</label>
+                                <input type="time" id="manualRecordStart" class="input-focus w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">结束时间</label>
+                                <input type="time" id="manualRecordEnd" class="input-focus w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400">或直接输入时长(分钟)</label>
+                            <input type="number" id="manualRecordMinutes" min="1" placeholder="如：45" class="input-focus w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white">
+                        </div>
+                        <select id="manualRecordSubject" class="input-focus w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white"></select>
+                        <button onclick="addManualTimeRecord()" class="w-full bg-primary-500 hover:bg-primary-600 text-white text-xs py-2 rounded-lg transition">补录记录</button>
+                    </div>
+                </div>
+                <!-- 历史记录快捷入口 -->
+                <div class="pt-4 border-t border-slate-100 space-y-2">
+                    <button onclick="closeTimerConfigPanel(); setTimeout(()=>document.getElementById('sessionListWrap')?.scrollIntoView({behavior:'smooth'}),200)" class="w-full text-xs text-slate-500 hover:text-primary-600 bg-slate-50 hover:bg-slate-100 py-1.5 rounded-lg transition">📝 查看/修改计时历史 →</button>
+                    <button onclick="closeTimerConfigPanel(); setTimeout(()=>document.getElementById('subjectTimeWrap')?.scrollIntoView({behavior:'smooth'}),200)" class="w-full text-xs text-slate-500 hover:text-primary-600 bg-slate-50 hover:bg-slate-100 py-1.5 rounded-lg transition">📚 各学科时长 →</button>
+                </div>
+            </div>
+
+            <!-- 每学科时长统计 -->
+            <div id="subjectTimeWrap" class="bg-white rounded-2xl p-5 shadow-sm timer-aux">
+                <h3 class="text-sm font-semibold text-slate-700 mb-3">📚 各学科学习时长</h3>
+                <div id="subjectTimeStats" class="space-y-2"></div>
+                <div id="subjectTimeEmpty" class="hidden text-center py-6 text-slate-300 text-sm">暂无计时数据</div>
+            </div>
+            <!-- 计时会话明细（支持修改/删除） -->
+            <div id="sessionListWrap" class="bg-white rounded-2xl p-5 shadow-sm timer-aux">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 class="text-sm font-semibold text-slate-700">📝 计时会话明细（可修改）</h3>
+                    <div class="flex gap-2">
+                        <select id="sessionSubjectFilter" onchange="renderSessionList()" class="input-focus px-2 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50"><option value="">全部学科</option></select>
+                        <select id="sessionCategoryFilter" onchange="renderSessionList()" class="input-focus px-2 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50"><option value="">全部分类</option></select>
+                    </div>
+                </div>
+                <div id="sessionList" class="space-y-1.5 max-h-96 overflow-y-auto"></div>
+                <div id="sessionEmpty" class="hidden text-center py-6 text-slate-300 text-sm">暂无计时会话</div>
+            </div>
+        </section>
+
+        <!-- ===== 视图4：数据复盘（统一入口 + 三层下钻） ===== -->
+        <section id="view-review" class="view space-y-4">
+            <h2 class="text-xl font-bold text-slate-800">数据复盘</h2>
+            <p class="text-xs text-slate-400 -mt-2">合并周复盘 / 月日历 / 时长统计 / 时段分析，三层下钻：总览 → 详情 → 明细</p>
+
+            <!-- 第一层：4张核心总览卡片 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button onclick="switchReviewTab('week')" class="bg-white rounded-2xl p-4 shadow-sm card-hover text-left">
+                    <div class="text-xs text-slate-400">📅 本周</div>
+                    <div id="weekTime" class="text-lg font-bold text-primary-600 mt-1">0h</div>
+                    <div id="weekDelta" class="text-[11px] text-slate-400 mt-0.5">对比上周 -</div>
+                </button>
+                <button onclick="switchReviewTab('month')" class="bg-white rounded-2xl p-4 shadow-sm card-hover text-left">
+                    <div class="text-xs text-slate-400">📆 本月</div>
+                    <div id="monthTime" class="text-lg font-bold text-emerald-600 mt-1">0h</div>
+                    <div id="monthDelta" class="text-[11px] text-slate-400 mt-0.5">对比上月 -</div>
+                </button>
+                <button onclick="switchReviewTab('year')" class="bg-white rounded-2xl p-4 shadow-sm card-hover text-left">
+                    <div class="text-xs text-slate-400">📈 本年累计</div>
+                    <div id="totalTime" class="text-lg font-bold text-slate-800 mt-1">0h</div>
+                    <div id="totalSessions" class="text-[11px] text-slate-400 mt-0.5">0 次会话</div>
+                </button>
+            </div>
+
+                <!-- 第二层：标签页切换（周/月/年） -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm">
+                <div class="flex bg-slate-100 rounded-lg p-0.5 mb-4 w-fit flex-wrap">
+                    <button onclick="switchReviewTab('week')" id="reviewTabWeek" class="review-tab review-tab-active px-4 py-1.5 text-xs rounded-md">周视图</button>
+                    <button onclick="switchReviewTab('month')" id="reviewTabMonth" class="review-tab px-4 py-1.5 text-xs rounded-md">月视图</button>
+                    <button onclick="switchReviewTab('year')" id="reviewTabYear" class="review-tab px-4 py-1.5 text-xs rounded-md">年视图</button>
+                </div>
+
+                <!-- 周视图 -->
+                <div id="reviewPane-week" class="review-pane space-y-4">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="text-sm font-semibold text-slate-700">每周复盘</h3>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="changeWeek(-1)" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 transition">← 上一周</button>
+                            <span id="weekLabel" class="text-xs font-medium text-slate-700 px-2 min-w-[100px] text-center"></span>
+                            <button onclick="changeWeek(1)" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 transition">下一周 →</button>
+                            <button onclick="goToCurrentWeek()" class="bg-primary-50 text-primary-600 px-2.5 py-1 rounded-lg text-xs hover:bg-primary-100 transition">本周</button>
+                            <button onclick="openWeekTimeSettings()" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 transition">时间轴设置</button>
+                        </div>
+                    </div>
+                    <!-- 本周完成率 + 颜色规则说明 + 历史未完成开关 -->
+                    <div class="bg-slate-50 rounded-xl p-3 flex items-center gap-4 flex-wrap">
+                        <div class="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-slate-200">
+                            <span class="text-[11px] text-slate-400">本周完成率</span>
+                            <span id="weekCompletionRate" class="text-xl font-bold text-primary-600">0%</span>
+                            <div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div id="weekCompletionBar" class="h-full bg-primary-500 rounded-full transition-all" style="width:0%"></div>
+                            </div>
+                            <span id="weekCompletionDetail" class="text-[10px] text-slate-400">0/0</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] flex-wrap">
+                            <span class="text-slate-400">颜色由全局分类决定，已完成条目同色系淡化</span>
+                            <button onclick="openClassificationManage()" class="text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2 py-0.5 rounded text-[11px]">管理全局分类</button>
+                        </div>
+                        <label class="flex items-center gap-1.5 text-[11px] ml-auto cursor-pointer select-none">
+                            <input type="checkbox" id="showOldUncompletedToggle" onchange="toggleOldUncompleted(this.checked)" class="w-3.5 h-3.5">
+                            <span class="text-slate-500">显示历史未完成</span>
+                        </label>
+                        <span class="text-[11px] text-slate-400">点击格子或拖拽选区新建计划</span>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-3 overflow-x-auto">
+                        <div id="weekGrid" class="min-w-[720px]"></div>
+                        <div id="weekGridEmpty" class="hidden text-center py-8 text-slate-300 text-sm">
+                            <div class="text-3xl mb-2">📅</div>本周暂无计划条目，点击格子开始安排
+                        </div>
+                    </div>
+                    <!-- 周复盘统计（饼图） -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-4">
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <h4 class="text-xs font-semibold text-slate-700">📊 复盘统计</h4>
+                            <div class="flex bg-slate-100 rounded-lg p-0.5">
+                                <button onclick="changeStatsRange('week')" id="statsTabWeek" class="stats-tab stats-tab-active px-2.5 py-0.5 text-[11px] rounded-md">周</button>
+                                <button onclick="changeStatsRange('month')" id="statsTabMonth" class="stats-tab px-2.5 py-0.5 text-[11px] rounded-md">月</button>
+                                <button onclick="changeStatsRange('year')" id="statsTabYear" class="stats-tab px-2.5 py-0.5 text-[11px] rounded-md">年</button>
+                            </div>
+                        </div>
+                        <div id="weekStatsSummary" class="text-xs text-slate-500 mb-3"></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div><h5 class="text-[11px] text-slate-400 mb-2 text-center">按学科占比</h5><div class="relative h-48"><canvas id="weeklySubjectChart"></canvas></div></div>
+                            <div><h5 class="text-[11px] text-slate-400 mb-2 text-center">按计时分类占比</h5><div class="relative h-48"><canvas id="weeklyCategoryChart"></canvas></div></div>
+                        </div>
+                    </div>
+                    <!-- 一周任务完成率 -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-4">
+                        <h4 class="text-xs font-semibold text-slate-700 mb-3">📅 最近一周任务完成率</h4>
+                        <div id="weekChart" class="flex items-end justify-between gap-2 h-32 mb-2"></div>
+                        <div id="weekEmpty" class="hidden text-center py-4 text-slate-300 text-xs">暂无一周数据</div>
+                    </div>
+                </div>
+
+                <!-- 月视图 -->
+                <div id="reviewPane-month" class="review-pane space-y-4 hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div class="bg-white rounded-xl border border-slate-200 p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-sm font-semibold text-slate-700">📅 月度日历</h3>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="changeMonth(-1)" class="text-slate-400 hover:text-slate-600 px-2">‹</button>
+                                    <span id="calMonthLabel" class="text-xs font-medium text-slate-700 min-w-[80px] text-center"></span>
+                                    <button onclick="changeMonth(1)" class="text-slate-400 hover:text-slate-600 px-2">›</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-400 mb-1">
+                                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                            </div>
+                            <div id="calendarGrid" class="grid grid-cols-7 gap-1"></div>
+                            <p class="text-[10px] text-slate-400 mt-2">🔵 点亮日期表示有学习记录，点击日期查看详情</p>
+                            <!-- v7 月历标记管理区 -->
+                            <div class="border-t border-slate-100 mt-3 pt-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-xs font-semibold text-slate-600">🏷️ 月历标记管理</h4>
+                                    <div class="flex gap-1.5">
+                                        <button onclick="openAddEventMarkerModal()" class="bg-rose-50 text-rose-600 hover:bg-rose-100 px-2 py-1 rounded text-[11px] transition">+新增事件标记</button>
+                                        <button onclick="openAddBlockMarkerModal()" class="bg-violet-50 text-violet-600 hover:bg-violet-100 px-2 py-1 rounded text-[11px] transition">+新增整体标记</button>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-slate-400">事件类：单天标记（窄条叠加）；整体类：跨天区间（半透明底色覆盖）</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 p-4">
+                            <h3 class="text-sm font-semibold text-slate-700 mb-3">📌 日期详情</h3>
+                            <!-- v7 当日标记区块：点击日历格时先显示这里 -->
+                            <div id="dayMarkersBlock" class="mb-3 pb-3 border-b border-slate-100 hidden">
+                                <div class="text-xs font-semibold text-slate-600 mb-1.5">当日标记：</div>
+                                <div id="dayMarkersList" class="space-y-1"></div>
+                            </div>
+                            <div id="dayDetail" class="text-sm text-slate-400">点击左侧日历日期查看当日任务、计时明细、完成率</div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-4">
+                        <h3 class="text-xs font-semibold text-slate-700 mb-3">📊 本月每日学习时长</h3>
+                        <div style="height:200px"><canvas id="monthBarChart"></canvas></div>
+                        <div id="monthBarEmpty" class="hidden text-center py-6 text-slate-300 text-sm">本月暂无数据</div>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 p-4">
+                        <h3 class="text-xs font-semibold text-slate-700 mb-3">📆 最近30天汇总</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-emerald-50 rounded-xl p-3 text-center"><div id="monthCheckinDays" class="text-2xl font-bold text-emerald-600">0</div><div class="text-xs text-slate-400 mt-1">打卡天数</div></div>
+                            <div class="bg-primary-50 rounded-xl p-3 text-center"><div id="monthAvgRate" class="text-2xl font-bold text-primary-600">0%</div><div class="text-xs text-slate-400 mt-1">平均完成率</div></div>
+                            <div class="bg-amber-50 rounded-xl p-3 text-center"><div id="monthAvgTime" class="text-2xl font-bold text-amber-600">0h</div><div class="text-xs text-slate-400 mt-1">日均时长</div></div>
+                        </div>
+                        <div id="monthDetails" class="mt-3 space-y-1.5 text-xs text-slate-500"></div>
+                    </div>
+                </div>
+
+                <!-- 年视图：横向12个月、纵向每月日期 -->
+                <div id="reviewPane-year" class="review-pane space-y-4 hidden">
+                    <div class="bg-white rounded-xl border border-slate-200 p-4 overflow-x-auto">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <button onclick="changeAnnualGridYear(-1)" class="text-slate-400 hover:text-slate-600 px-2 py-1">‹</button>
+                                <h3 id="yearGridTitle" class="text-sm font-semibold text-slate-700">📅 年度日程表</h3>
+                                <button onclick="changeAnnualGridYear(1)" class="text-slate-400 hover:text-slate-600 px-2 py-1">›</button>
+                            </div>
+                            <span class="text-[11px] text-slate-400">点击单元格填写日程</span>
+                        </div>
+                        <div id="yearGrid" class="year-grid"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 视图5：学科管理 ===== -->
+        <section id="view-subjects" class="view space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <h2 class="text-xl font-bold text-slate-800">学科管理</h2>
+                <button onclick="openAddSubjectModal()" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1"><span>+</span> 新增学科</button>
+            </div>
+            <p class="text-xs text-slate-400">设置学科权重影响综合进度计算；展开学科可管理每日/长期任务、听课进度、子模块</p>
+            <div id="subjectCards" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div id="subjectEmpty" class="hidden text-center py-10 text-slate-300"><div class="text-5xl mb-3">📁</div><p class="text-sm">还没有学科，点击「新增学科」</p></div>
+        </section>
+
+        <section id="view-entertainment" class="view space-y-4">
+            <div id="entertainmentHomePage" class="space-y-5">
+                <div class="flex items-center justify-between flex-wrap gap-2"><div><h2 class="text-xl font-bold text-slate-800">娱乐</h2><p class="text-xs text-slate-400 mt-1">选择一个入口，安排你的休闲时间</p></div><button onclick="drawEntertainmentKind()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm transition">🎲 随机</button></div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <button onclick="enterEntertainmentPage('collection')" class="entertainment-kind-card bg-gradient-to-br from-sky-400 to-blue-500 rounded-2xl p-4 text-white shadow-sm flex flex-col items-center justify-center text-center"><span class="text-4xl mb-3">🎞️</span><span class="entertainment-kind-title text-xl font-bold">收藏馆</span><span class="text-[11px] text-white/80 mt-2">作品与进度</span></button>
+                    <button onclick="enterEntertainmentPage('restrictions')" class="entertainment-kind-card bg-gradient-to-br from-rose-400 to-orange-400 rounded-2xl p-4 text-white shadow-sm flex flex-col items-center justify-center text-center"><span class="text-4xl mb-3">🧭</span><span class="entertainment-kind-title text-xl font-bold">限制清单</span><span class="text-[11px] text-white/80 mt-2">规则与提醒</span></button>
+                    <div id="entertainmentKindGrid" class="contents"></div>
+                </div>
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"><div class="flex items-center justify-between gap-3 mb-3"><div><h3 class="font-semibold text-slate-700">娱乐种类</h3><p class="text-xs text-slate-400 mt-1">添加一种娱乐方式，随机按钮会从这里抽取</p></div><div class="flex gap-2"><input id="entertainmentKindName" class="input-focus w-36 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50" placeholder="种类名称"><button onclick="addEntertainmentKind()" class="bg-primary-500 hover:bg-primary-600 text-white px-3 py-2 rounded-lg text-sm">添加</button></div></div><div id="entertainmentKindManageList" class="flex flex-wrap gap-2"></div></div>
+            </div>
+            <div id="entertainmentCollectionPage" class="hidden space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2"><div class="flex items-center gap-3"><button onclick="enterEntertainmentPage('home')" class="text-slate-500 hover:text-primary-600 text-lg" aria-label="返回娱乐主页">←</button><div><h2 class="text-xl font-bold text-slate-800">收藏馆</h2><p class="text-xs text-slate-400 mt-1">管理你的作品清单</p></div></div><div class="flex gap-2"><button onclick="openEntertainmentSettings()" class="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 transition">⚙ 设置</button><button onclick="openEntertainmentWorkModal()" class="bg-primary-500 hover:bg-primary-600 text-white px-3 py-2 rounded-lg text-sm transition">+ 添加作品</button></div></div>
+                <div class="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between flex-wrap gap-3"><div class="flex items-center gap-2"><span class="text-2xl">🎞️</span><div><h3 class="font-semibold text-slate-700">收藏馆</h3><p id="entertainmentSummary" class="text-xs text-slate-400"></p></div></div><button onclick="openEntertainmentRandomModal()" class="bg-amber-50 text-amber-700 px-3 py-2 rounded-lg text-sm hover:bg-amber-100 transition">🎲 随机抽取作品</button></div>
+                <div id="entertainmentCategoryTabs" class="flex gap-1.5 flex-wrap"></div><div id="entertainmentSubcategoryTabs" class="hidden flex gap-1.5 flex-wrap"></div><div class="flex bg-slate-100 rounded-lg p-0.5 w-fit"><button id="entertainmentStatusFollowing" onclick="toggleEntertainmentStatus('following')" class="px-4 py-1.5 text-xs rounded-md text-slate-500">在追</button><button id="entertainmentStatusFinished" onclick="toggleEntertainmentStatus('finished')" class="px-4 py-1.5 text-xs rounded-md text-slate-500">看完</button></div><div id="entertainmentWorkGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div><div id="entertainmentEmpty" class="hidden text-center py-14 text-slate-300"><div class="text-5xl mb-3">📚</div><p class="text-sm">暂无作品，添加一部喜欢的作品吧</p></div>
+            </div>
+            <div id="entertainmentRestrictionsPage" class="hidden space-y-4"><div class="flex items-center gap-3"><button onclick="enterEntertainmentPage('home')" class="text-slate-500 hover:text-primary-600 text-lg" aria-label="返回娱乐主页">←</button><div><h2 class="text-xl font-bold text-slate-800">限制清单</h2><p class="text-xs text-slate-400 mt-1">记录娱乐边界、规则和行动提醒</p></div></div><div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"><div class="flex gap-2"><input id="entertainmentRestrictionInput" class="input-focus flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50" placeholder="例如：完成今日任务后再看一集"><button onclick="addEntertainmentRestriction()" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm">添加</button></div><div id="entertainmentRestrictionList" class="mt-4 space-y-2"></div><div id="entertainmentRestrictionEmpty" class="text-center py-10 text-slate-300 text-sm">还没有限制条目</div></div></div>
+            <div id="entertainmentKindRandomModal" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeEntertainmentKindRandom()"><div class="relative w-full max-w-md text-center"><button onclick="closeEntertainmentKindRandom()" class="absolute right-0 -top-10 text-white text-2xl" aria-label="关闭">✕</button><div class="entertainment-kind-card max-w-xs mx-auto rounded-3xl p-8 text-white shadow-2xl flex flex-col items-center justify-center" id="entertainmentKindRandomCard"><span id="entertainmentKindRandomIcon" class="text-6xl mb-5">🎲</span><span id="entertainmentKindRandomName" class="entertainment-kind-title text-4xl font-bold"></span><span class="text-sm text-white/80 mt-4">今天就选这个</span></div><button onclick="drawEntertainmentKind()" class="mt-5 bg-white text-slate-700 px-5 py-2 rounded-lg text-sm shadow">再抽一次</button></div></div>
+        </section>
+
+        </main>
+    </div>
+</div>
+
+<!-- ========== 个人面板（滑入式侧边面板，双入口） ========== -->
+<div id="personalPanel" class="slide-panel fixed top-0 right-0 h-full w-96 max-w-[95vw] bg-white shadow-2xl z-50 overflow-y-auto">
+    <div class="p-6 space-y-5">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-800">个人面板</h3>
+            <button onclick="closePersonalPanel()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+        <!-- 用户信息头部 -->
+        <div class="bg-gradient-to-br from-indigo-500 via-primary-500 to-blue-500 rounded-2xl p-5 text-white">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 rounded-full bg-white/20 backdrop-blur flex items-center justify-center font-bold text-2xl shadow-lg" id="ppAvatar">学</div>
+                <div class="flex-1">
+                    <div id="ppUsername" class="text-xl font-bold cursor-text" onclick="editUsername()">学习者</div>
+                </div>
+                <button onclick="editUsername()" class="text-xs text-white/80 hover:text-white bg-white/15 px-2.5 py-1 rounded-lg transition">✎ 编辑</button>
+            </div>
+                <div class="mt-4 flex justify-end">
+                    <button onclick="switchAccount()" class="text-xs text-white/80 hover:text-white bg-white/15 px-3 py-1.5 rounded-lg transition">切换账号</button>
+                </div>
+        </div>
+        <!-- 整体属性数据 -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-primary-50 rounded-xl p-3">
+                <div class="text-[10px] text-primary-500 mb-1">📅 累计打卡</div>
+                <div class="text-2xl font-bold text-primary-600"><span id="ppTotalCheckin">0</span><span class="text-xs text-primary-400 ml-1">天</span></div>
+            </div>
+            <div class="bg-emerald-50 rounded-xl p-3">
+                <div class="text-[10px] text-emerald-500 mb-1">⏱️ 累计时长</div>
+                <div class="text-2xl font-bold text-emerald-600" id="ppTotalTime">0h</div>
+            </div>
+            <div class="bg-indigo-50 rounded-xl p-3">
+                <div class="text-[10px] text-indigo-500 mb-1">🎯 综合进度</div>
+                <div class="text-2xl font-bold text-indigo-600"><span id="ppOverallPct">0</span><span class="text-xs text-indigo-400 ml-1">%</span></div>
+            </div>
+            <div class="bg-amber-50 rounded-xl p-3">
+                <div class="text-[10px] text-amber-500 mb-1">📝 累计会话</div>
+                <div class="text-2xl font-bold text-amber-600"><span id="ppSessions">0</span><span class="text-xs text-amber-400 ml-1">次</span></div>
+            </div>
+            <div class="bg-pink-50 rounded-xl p-3">
+                <div class="text-[10px] text-pink-500 mb-1">📚 学科数量</div>
+                <div class="text-2xl font-bold text-pink-600"><span id="ppSubjects">0</span><span class="text-xs text-pink-400 ml-1">科</span></div>
+            </div>
+        </div>
+        <!-- 各学科进度列表 -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <h4 class="text-sm font-semibold text-slate-700 mb-3">📖 各学科进度</h4>
+            <div id="ppSubjectProgress" class="space-y-2"></div>
+            <div id="ppSubjectEmpty" class="hidden text-center py-4 text-slate-300 text-xs">暂无学科数据</div>
+        </div>
+        <!-- 全局目标 -->
+        <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-4 border border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-semibold text-slate-700">🌟 整体大目标</h4>
+                <button onclick="editGoalText(); setTimeout(renderPersonalPanel,100)" class="text-[10px] text-primary-600 hover:text-primary-700">编辑</button>
+            </div>
+            <div id="ppGoal" class="text-sm text-slate-600 bg-white rounded-lg p-3 min-h-[40px]">未设置大目标</div>
+        </div>
+    </div>
+</div>
+<div id="personalPanelOverlay" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closePersonalPanel()"></div>
+
+<!-- ========== 离线账号管理 ========== -->
+<div id="accountSwitcherModal" class="hidden fixed inset-0 bg-black/40 z-[65] flex items-center justify-center p-4" onclick="if(event.target===this)closeAccountSwitcher()">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-slate-800">切换账号</h3>
+            <button onclick="closeAccountSwitcher()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+        <div class="bg-primary-50 border border-primary-100 rounded-xl p-3 mb-4">
+            <div class="text-[11px] text-primary-600 mb-1">当前登录账号</div>
+            <div id="accountCurrentName" class="font-semibold text-primary-800">未登录</div>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-semibold text-slate-600">曾经登录过的账号</h4>
+            <span class="text-[10px] text-slate-400">切换时需要密码</span>
+        </div>
+        <div id="accountList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+        <div id="accountListEmpty" class="hidden text-center py-5 text-xs text-slate-400">暂无其他留存账号</div>
+        <div class="flex justify-between items-center mt-5 pt-4 border-t border-slate-100">
+            <button onclick="unregisterCurrentAccount()" class="text-xs text-red-500 hover:text-red-600">注销当前账号</button>
+            <button onclick="closeAccountSwitcher()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 计时悬浮窗 ========== -->
+<div id="timerFloatWindow" class="timer-float hidden">
+    <div class="flex justify-between items-center mb-2">
+        <span class="text-xs font-medium text-slate-700">悬浮计时</span>
+        <div class="flex gap-1">
+            <button onclick="minimizeTimerFloat()" class="text-slate-400 hover:text-slate-600 text-xs" title="最小化">−</button>
+            <button onclick="closeTimerFloatWindow()" class="text-slate-400 hover:text-slate-600 text-xs" title="关闭">✕</button>
+        </div>
+    </div>
+    <div id="floatTimerDisplay" class="text-2xl font-bold text-primary-600 text-center mb-2 timer-display">00:00:00</div>
+    <div class="timer-float-actions grid grid-cols-3 gap-1">
+        <button onclick="startTimer()" id="floatStartBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs py-1 rounded">开始</button>
+        <button onclick="pauseTimer()" id="floatPauseBtn" class="bg-amber-500 hover:bg-amber-600 text-white text-xs py-1 rounded" disabled>暂停</button>
+        <button onclick="stopTimer(); closeTimerFloatWindow()" id="floatStopBtn" class="bg-red-500 hover:bg-red-600 text-white text-xs py-1 rounded" disabled>停止</button>
+    </div>
+    <button onclick="switchView('timer'); closeTimerFloatWindow()" class="timer-float-actions mt-2 w-full text-[10px] text-slate-400 hover:text-primary-600 bg-slate-50 py-1 rounded transition">返回计时页 →</button>
+</div>
+
+<!-- ========== 主线任务编辑面板（滑入式） ========== -->
+<div id="mainLinePanel" class="slide-panel fixed top-0 right-0 h-full w-96 max-w-[95vw] bg-white shadow-2xl z-50 overflow-y-auto">
+    <div class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+            <h3 id="mlPanelTitle" class="text-lg font-bold text-slate-800">新建主线任务</h3>
+            <button onclick="closeMainLinePanel()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">主线任务名称（对标整体大目标）</label>
+            <input id="mlNameInput" type="text" placeholder="如：2025考研成功上岸" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">目标描述（可选）</label>
+            <textarea id="mlDescInput" rows="3" placeholder="详细描述你的主线目标..." class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></textarea>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">截止日期（可选）</label>
+            <input id="mlDeadlineInput" type="date" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+            <button onclick="closeMainLinePanel()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+            <button onclick="saveMainLine()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">保存</button>
+        </div>
+    </div>
+</div>
+<div id="mainLineOverlay" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeMainLinePanel()"></div>
+
+<!-- ========== v7 新增：支线滑出编辑面板（结构与主线一致，主色 emerald 系） ========== -->
+<div id="sideLinePanel" class="slide-panel fixed top-0 right-0 h-full w-96 max-w-[95vw] bg-white shadow-2xl z-50 overflow-y-auto">
+    <div class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+            <h3 id="slPanelTitle" class="text-lg font-bold text-slate-800">新建支线任务</h3>
+            <button onclick="closeSideLinePanel()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">支线任务名称</label>
+            <input id="slNameInput" type="text" placeholder="如：英语课外阅读积累" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">目标描述（可选）</label>
+            <textarea id="slDescInput" rows="3" placeholder="详细描述你的支线目标..." class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></textarea>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400 mb-1 block">截止日期（可选）</label>
+            <input id="slDeadlineInput" type="date" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+            <button onclick="closeSideLinePanel()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+            <button onclick="saveSideLine()" class="px-4 py-2 text-sm bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg">保存</button>
+        </div>
+    </div>
+</div>
+<div id="sideLineOverlay" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeSideLinePanel()"></div>
+
+<!-- ========== 章节/周常任务编辑弹窗（v7 修改：同时支持主线/支线） ========== -->
+<div id="chapterModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="chapterModalTitle" class="text-lg font-semibold mb-4">新增章节</h3>
+    <input type="hidden" id="chapterMainLineId">
+    <input type="hidden" id="chapterLineType" value="main">  <!-- v7 新增：main|side -->
+    <input type="hidden" id="chapterEditId">
+    <label class="text-xs text-slate-400">标题</label>
+    <input id="chapterTitleInput" type="text" placeholder="如：英语基础语法篇" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <div class="flex gap-2 mb-3">
+        <div class="flex-1">
+            <label class="text-xs text-slate-400">进度(%)</label>
+            <input id="chapterPercentInput" type="number" min="0" max="100" value="0" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50">
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button onclick="closeChapterModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="chapterDeleteBtn" onclick="deleteChapter()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveChapter()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg" id="chapterSaveBtn">保存</button>
+    </div>
+</div></div>
+
+<div id="weeklyTaskModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="wtModalTitle" class="text-lg font-semibold mb-4">新增周常任务</h3>
+    <input type="hidden" id="wtMainLineId">
+    <input type="hidden" id="wtLineType" value="main">  <!-- v7 新增：main|side -->
+    <input type="hidden" id="wtEditId">
+    <label class="text-xs text-slate-400">任务内容</label>
+    <input id="wtContentInput" type="text" placeholder="如：每周一、三、五背单词" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">所属学科</label>
+    <select id="wtSubjectInput" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50"></select>
+    <label class="text-xs text-slate-400">执行周期</label>
+    <select id="wtTypeInput" onchange="onWtScheduleChange()" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+        <option value="daily">每天模式：每日自动生成该任务</option>
+        <option value="weekly">自定义每周模式：选择每周固定执行的星期</option>
+        <option value="memory">记忆曲线模式：按艾宾浩斯复习间隔自动生成任务</option>
+    </select>
+    <div class="bg-primary-50 border border-primary-100 rounded-lg p-3 mb-3">
+        <label class="text-xs font-medium text-primary-700 block mb-1">每周目标完成次数（例如：每周 5 次）</label>
+        <input id="wtWeeklyTargetInput" type="number" min="1" value="1" placeholder="请输入每周需要完成的次数" class="input-focus w-full px-3 py-2 text-sm border border-primary-200 rounded-lg bg-white">
+        <p class="text-[10px] text-primary-500 mt-1">系统会按本周已完成次数和剩余天数自动判断是否继续显示</p>
+    </div>
+    <div id="wtWeeklyDaysWrap" class="hidden mb-4">
+        <label class="text-xs text-slate-400">选择星期（多选，至少1天）</label>
+        <div class="flex gap-1 mt-1" id="wtWeeklyDays">
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="0" class="hidden">日</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="1" class="hidden">一</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="2" class="hidden">二</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="3" class="hidden">三</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="4" class="hidden">四</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="5" class="hidden">五</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="6" class="hidden">六</label>
+        </div>
+    </div>
+    <div id="wtMemoryWrap" class="hidden mb-4 space-y-2">
+        <div>
+            <label class="text-xs text-slate-400">记忆曲线总时长（月）：复习任务将在该时长范围内按艾宾浩斯间隔自动生成</label>
+            <select id="wtMemoryMonths" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mt-1 bg-slate-50">
+                <option value="1">1个月（间隔：0,1,2,4,7,15,30天）</option>
+                <option value="3">3个月（+60天、90天）</option>
+                <option value="6">6个月（+180天）</option>
+                <option value="12" selected>1年（+365天，推荐）</option>
+                <option value="24">2年（+730天）</option>
+            </select>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400">首次学习日期（记忆曲线从这天开始按间隔计算）</label>
+            <input type="date" id="wtMemoryStartDate" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mt-1 bg-slate-50">
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button onclick="closeWeeklyTaskModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="wtDeleteBtn" onclick="deleteWeeklyTask()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveWeeklyTask()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg" id="wtSaveBtn">保存</button>
+    </div>
+</div></div>
+
+<!-- ========== 学科每日任务周期模板弹窗（与周常任务完全对齐：每天/每周/记忆曲线） ========== -->
+<div id="subDailyTplModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="sdtModalTitle" class="text-lg font-semibold mb-4">新增学科每日周期任务</h3>
+    <input type="hidden" id="sdtSubjectId">
+    <input type="hidden" id="sdtEditId">
+    <label class="text-xs text-slate-400">任务内容</label>
+    <input id="sdtContentInput" type="text" placeholder="如：每天背诵100个单词" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">执行周期</label>
+    <select id="sdtTypeInput" onchange="onSdtScheduleChange()" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+        <option value="daily">每天模式：每日自动生成该任务</option>
+        <option value="weekly">自定义每周模式：选择每周固定执行的星期</option>
+        <option value="memory">记忆曲线模式：按艾宾浩斯复习间隔自动生成任务</option>
+    </select>
+    <div id="sdtWeeklyDaysWrap" class="hidden mb-4">
+        <label class="text-xs text-slate-400">选择星期（多选，至少1天）</label>
+        <div class="flex gap-1 mt-1" id="sdtWeeklyDays">
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="0" class="hidden">日</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="1" class="hidden">一</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="2" class="hidden">二</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="3" class="hidden">三</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="4" class="hidden">四</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="5" class="hidden">五</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="6" class="hidden">六</label>
+        </div>
+    </div>
+    <div id="sdtMemoryWrap" class="hidden mb-4 space-y-2">
+        <div>
+            <label class="text-xs text-slate-400">记忆曲线总时长（月）：复习任务将在该时长范围内按艾宾浩斯间隔自动生成</label>
+            <select id="sdtMemoryMonths" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mt-1 bg-slate-50">
+                <option value="1">1个月（间隔：0,1,2,4,7,15,30天）</option>
+                <option value="3">3个月（+60天、90天）</option>
+                <option value="6">6个月（+180天）</option>
+                <option value="12" selected>1年（+365天，推荐）</option>
+                <option value="24">2年（+730天）</option>
+            </select>
+        </div>
+        <div>
+            <label class="text-xs text-slate-400">首次学习日期（记忆曲线从这天开始按间隔计算）</label>
+            <input type="date" id="sdtMemoryStartDate" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mt-1 bg-slate-50">
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button onclick="closeSubDailyTplModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="sdtDeleteBtn" onclick="deleteSubDailyTpl()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveSubDailyTpl()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">保存</button>
+    </div>
+</div></div>
+
+<!-- ========== 计时记录修改弹窗 ========== -->
+<div id="editSessionModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">修改计时记录</h3>
+    <input type="hidden" id="esSessionId">
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <div>
+            <label class="text-xs text-slate-400">日期</label>
+            <input type="date" id="esDate" class="input-focus w-full px-2 py-1.5 text-sm border border-slate-200 rounded bg-slate-50">
+        </div>
+        <div>
+            <label class="text-xs text-slate-400">时长(分钟)</label>
+            <input type="number" id="esMinutes" min="1" class="input-focus w-full px-2 py-1.5 text-sm border border-slate-200 rounded bg-slate-50">
+        </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <div>
+            <label class="text-xs text-slate-400">开始时间</label>
+            <input type="time" id="esStartTime" class="input-focus w-full px-2 py-1.5 text-sm border border-slate-200 rounded bg-slate-50">
+        </div>
+        <div>
+            <label class="text-xs text-slate-400">结束时间</label>
+            <input type="time" id="esEndTime" class="input-focus w-full px-2 py-1.5 text-sm border border-slate-200 rounded bg-slate-50">
+        </div>
+    </div>
+    <div class="mb-4">
+        <label class="text-xs text-slate-400">学科</label>
+        <select id="esSubject" class="input-focus w-full px-2 py-1.5 text-sm border border-slate-200 rounded bg-slate-50"></select>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button onclick="closeEditSessionModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button onclick="deleteSession()" class="px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveEditedSession()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">保存</button>
+    </div>
+</div></div>
+
+<!-- ========== 通用模态框 ========== -->
+<div id="addSubjectModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">新增学科</h3>
+    <input id="subjectNameInput" type="text" placeholder="输入学科名称..." class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">所属课程汇总（可选，例如：数学）</label>
+    <input id="subjectGroupInput" type="text" placeholder="高数、线性代数、概率论可填写：数学" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">权重（影响综合进度，默认1）</label>
+    <input id="subjectWeightInput" type="number" min="0.1" step="0.1" value="1" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeAddSubjectModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="addSubject()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">确认</button></div>
+</div></div>
+<div id="renameSubjectModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">重命名学科</h3>
+    <input id="renameSubjectInput" type="text" placeholder="输入新的学科名称..." class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <label class="text-xs text-slate-400">所属课程汇总（可选）</label>
+    <input id="renameSubjectGroupInput" type="text" placeholder="例如：数学；留空表示不归组" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeRenameSubjectModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="renameSubject()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">确认</button></div>
+</div></div>
+<div id="editTaskModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">编辑任务</h3>
+    <input id="editTaskInput" type="text" placeholder="修改任务内容..." class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeEditTaskModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveEditedTask()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<div id="addMidTaskModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">新增中期任务</h3>
+    <label class="text-xs text-slate-400">任务标题</label>
+    <input id="midTaskTitleInput" type="text" placeholder="如：背完考研词汇" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">截止日期（可选）</label>
+    <input id="midTaskDeadlineInput" type="date" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeAddMidTaskModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="addMidTask()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">确认</button></div>
+</div></div>
+<div id="editMidTaskModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">编辑中期任务</h3>
+    <label class="text-xs text-slate-400">任务标题</label>
+    <input id="editMidTaskTitle" type="text" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">截止日期（可选）</label>
+    <input id="editMidTaskDeadline" type="date" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <label class="flex items-center gap-2 text-xs text-slate-500 mb-4"><input id="editMidTaskVisible" type="checkbox" class="w-4 h-4"> 在首页总览展示</label>
+    <div class="flex gap-2 justify-end"><button onclick="closeEditMidTaskModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveEditMidTask()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<div id="periodicModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="periodicModalTitle" class="text-lg font-semibold mb-4">新增周期模板</h3>
+    <label class="text-xs text-slate-400">任务内容</label>
+    <input id="periodicContentInput" type="text" placeholder="如：背30个单词" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">所属学科</label>
+    <select id="periodicSubjectInput" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50"></select>
+    <label class="text-xs text-slate-400">执行周期</label>
+    <select id="periodicTypeInput" onchange="onPeriodicTypeChange()" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+        <option value="daily">每天</option><option value="weekly">每周指定星期</option>
+    </select>
+    <div id="weeklyDaysWrap" class="hidden mb-4">
+        <label class="text-xs text-slate-400">选择星期（多选）</label>
+        <div class="flex gap-1 mt-1" id="weeklyDays">
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="0" class="hidden">日</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="1" class="hidden">一</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="2" class="hidden">二</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="3" class="hidden">三</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="4" class="hidden">四</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="5" class="hidden">五</label>
+            <label class="flex-1 text-center text-xs border border-slate-200 rounded py-1 cursor-pointer hover:bg-primary-50"><input type="checkbox" value="6" class="hidden">六</label>
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end"><button onclick="closePeriodicModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button id="periodicSaveBtn" onclick="savePeriodic()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<!-- v9b 全局自定义分类管理（替换原学科子分类管理） -->
+<div id="classificationModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-2">管理全局分类</h3>
+    <p class="text-xs text-slate-400 mb-3">用于每周复盘条目颜色（如学习/生活/娱乐），可自定义名称和颜色</p>
+    <div id="classificationList" class="space-y-2 mb-3 max-h-60 overflow-y-auto"></div>
+    <div class="flex gap-1 mb-4">
+        <input id="clsModalNewName" type="text" placeholder="新分类名" class="input-focus flex-1 px-2 py-1.5 text-sm border border-slate-200 rounded-lg bg-slate-50" onkeypress="if(event.key==='Enter') addClassificationFromModal()">
+        <input type="color" id="clsModalNewColor" value="#3b82f6" class="w-9 h-9 rounded border border-slate-200 bg-white cursor-pointer" title="颜色">
+        <button onclick="addClassificationFromModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1.5 rounded-lg text-sm">+</button>
+    </div>
+    <div class="flex justify-end"><button onclick="closeClassificationModal()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">完成</button></div>
+</div></div>
+<!-- 登录/注册 Modal（默认可见，无需JS执行即可显示） -->
+<div id="authModal" class="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4" style="display:flex;">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter" style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:384px;">
+    <div class="text-center mb-5">
+      <div class="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-xl shadow-lg mb-2" style="width:56px;height:56px;margin:auto;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#0284c7);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:20px;margin-bottom:8px;">学</div>
+      <h3 id="authModalTitle" class="text-lg font-semibold text-slate-800" style="font-size:18px;font-weight:600;color:#1e293b;">登录</h3>
+      <p id="authModalSubtitle" class="text-xs text-slate-400 mt-1" style="font-size:12px;color:#94a3b8;margin-top:4px;">跨设备同步你的学习进度</p>
+      <div id="authBackendStatus" class="mt-2 text-[10px] text-emerald-500 hidden">● 后端已连接</div>
+      <div id="authBackendOffline" class="mt-2 text-[10px] text-amber-500" style="margin-top:8px;font-size:11px;color:#f59e0b;">⚠ 当前为离线本地模式</div>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block" style="font-size:12px;color:#94a3b8;margin-bottom:4px;display:block;">用户名</label>
+        <input id="authUsername" type="text" placeholder="2个字符以上" class="input-focus w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-slate-50" style="width:100%;padding:8px 12px;font-size:14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;" onkeypress="if(event.key==='Enter') document.getElementById('authPassword').focus()">
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block" style="font-size:12px;color:#94a3b8;margin-bottom:4px;display:block;">密码</label>
+        <input id="authPassword" type="password" placeholder="4个字符以上" class="input-focus w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-slate-50" style="width:100%;padding:8px 12px;font-size:14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;" onkeypress="if(event.key==='Enter') submitAuth()">
+      </div>
+      <p id="authError" class="text-xs text-red-500 hidden" style="font-size:12px;color:#ef4444;"></p>
+      <button onclick="submitAuth()" id="authSubmitBtn" class="w-full bg-primary-500 hover:bg-primary-600 text-white py-2.5 rounded-lg text-sm font-medium transition" style="width:100%;background:#0ea5e9;color:#fff;padding:10px;border-radius:8px;font-size:14px;font-weight:500;border:none;cursor:pointer;">登录</button>
+      <div class="flex justify-center gap-3 text-xs" style="display:flex;justify-content:center;gap:12px;font-size:12px;">
+        <button onclick="switchAuthMode('login')" id="authTabLogin" class="text-primary-600 font-medium" style="color:#0284c7;font-weight:500;background:none;border:none;cursor:pointer;">登录</button>
+        <span class="text-slate-300" style="color:#cbd5e1;">|</span>
+        <button onclick="switchAuthMode('register')" id="authTabRegister" class="text-slate-400 hover:text-primary-600" style="color:#94a3b8;background:none;border:none;cursor:pointer;" onmouseover="this.style.color='#0284c7'" onmouseout="this.style.color='#94a3b8'">注册新账号</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="confirmModal" class="hidden fixed inset-0 bg-black/40 z-[70] flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-2">确认操作</h3>
+    <p id="confirmText" class="text-sm text-slate-500 mb-4">确定要执行吗？</p>
+    <div class="flex gap-2 justify-end"><button onclick="closeConfirmModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button id="confirmOkBtn" class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg">确认</button></div>
+</div></div>
+<div id="subModuleModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">编辑子模块</h3>
+    <label class="text-xs text-slate-400">子模块名称</label>
+    <input id="subModNameInput" type="text" placeholder="如：背3500单词" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <div class="flex gap-2 mb-3">
+        <div class="flex-1"><label class="text-xs text-slate-400">目标总量</label><input id="subModTargetInput" type="number" min="1" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+        <div class="flex-1"><label class="text-xs text-slate-400">当前已完成</label><input id="subModCurrentInput" type="number" min="0" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+    </div>
+    <label class="text-xs text-slate-400">匹配关键词（用、或逗号分隔，每日任务文本命中时自动+1）</label>
+    <input id="subModKeywordsInput" type="text" placeholder="如：背单词、英语、词汇" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeSubModuleModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveSubModule()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<div id="longPlanModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="longPlanModalTitle" class="text-lg font-semibold mb-4">新增长期计划</h3>
+    <label class="text-xs text-slate-400">计划内容</label>
+    <input id="longPlanTextInput" type="text" placeholder="如：完成考研英语一轮复习" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">完成进度（0-100%）</label>
+    <input id="longPlanPercentInput" type="number" min="0" max="100" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-4 bg-slate-50">
+    <div class="flex gap-2 justify-end"><button onclick="closeLongPlanModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveLongPlan()" class="px-4 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<div id="weeklyPlanModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="weeklyPlanModalTitle" class="text-lg font-semibold mb-4">新建计划</h3>
+    <label class="text-xs text-slate-400">计划内容</label>
+    <input id="weeklyPlanContentInput" type="text" placeholder="如：精读英语作文1篇" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <div class="mb-3"><label class="text-xs text-slate-400">分类（决定颜色）</label><select id="weeklyPlanClassificationSelect" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select></div>
+    <!-- v7 精确时间：将下拉改为 <input type="time">，保留原ID不变 -->
+    <div class="grid grid-cols-2 gap-2 mb-4">
+        <div><label class="text-xs text-slate-400">精确开始时间</label><input type="time" id="weeklyPlanStartSelect" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+        <div><label class="text-xs text-slate-400">精确结束时间</label><input type="time" id="weeklyPlanEndSelect" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+    </div>
+    <div class="flex items-center gap-2 mb-4 text-[11px]">
+        <label class="flex items-center gap-1.5 cursor-pointer select-none"><input type="checkbox" id="weeklyPlanCompleted" class="w-3.5 h-3.5"><span>已完成</span></label>
+    </div>
+    <div class="flex gap-2 justify-end flex-wrap">
+        <button onclick="closeWeeklyPlanModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="weeklyPlanDeleteBtn" onclick="deleteWeeklyPlan()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button id="weeklyPlanCompleteBtn" onclick="completeWeeklyPlanFromModal()" class="hidden px-4 py-2 text-sm bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg">标记完成</button>
+        <button id="weeklyPlanSaveBtn" onclick="saveWeeklyPlan()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">保存</button>
+    </div>
+</div></div>
+<div id="timerSubjectModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-2">选择计时科目</h3>
+    <p id="timerSubjectModalMessage" class="text-xs text-slate-400 mb-4">当前时间没有匹配到包含科目名称的周视图计划，请选择本次计时所属科目。</p>
+    <label class="text-xs text-slate-400 mb-1 block" for="timerSubjectModalSelect">科目</label>
+    <select id="timerSubjectModalSelect" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 mb-4"></select>
+    <div class="flex gap-2 justify-end">
+        <button onclick="closeTimerSubjectModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button onclick="confirmTimerSubjectSelection()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">开始计时</button>
+    </div>
+</div></div>
+<div id="weekTimeSettingsModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 class="text-lg font-semibold mb-4">时间轴设置</h3>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <div><label class="text-xs text-slate-400">起始时间</label><input type="time" id="weekTimeStartInput" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+        <div><label class="text-xs text-slate-400">结束时间</label><input type="time" id="weekTimeEndInput" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+    </div>
+    <label class="flex items-center gap-2 mb-3 text-xs text-slate-500"><input type="checkbox" id="weekTimeAllDayInput" onchange="toggleWeekTimeAllDay(this.checked)">全天（00:00 - 24:00）</label>
+    <label class="text-xs text-slate-400">时间格单位（分钟）</label>
+    <input type="number" id="weekTimeSlotInput" min="15" max="1440" step="15" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 mb-4">
+    <div class="flex gap-2 justify-end"><button onclick="closeWeekTimeSettings()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveWeekTimeSettings()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">应用</button></div>
+</div></div>
+<div id="entertainmentWorkModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-md modal-enter">
+    <h3 id="entertainmentWorkModalTitle" class="text-lg font-semibold mb-4">添加作品</h3>
+    <input type="hidden" id="entertainmentWorkId">
+    <label class="text-xs text-slate-400">标题</label><input id="entertainmentWorkTitle" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 mb-3" placeholder="作品名称">
+    <label class="text-xs text-slate-400">备注</label><textarea id="entertainmentWorkNote" rows="2" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 mb-3" placeholder="可选"></textarea>
+    <div class="grid grid-cols-2 gap-2 mb-3"><div><label class="text-xs text-slate-400">大分类</label><select id="entertainmentWorkCategory" onchange="fillEntertainmentSubcategory('entertainmentWorkSubcategory',this.value)" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select></div><div><label class="text-xs text-slate-400">小分类</label><select id="entertainmentWorkSubcategory" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select></div></div>
+    <div class="flex gap-4 mb-3 text-sm"><label><input type="radio" name="entertainmentStatus" value="following" onchange="toggleEntertainmentEpisodeFields()" checked> 在追</label><label><input type="radio" name="entertainmentStatus" value="finished" onchange="toggleEntertainmentEpisodeFields()"> 看完</label></div>
+    <div id="entertainmentRewatchField" class="hidden mb-3"><label class="text-xs text-slate-400">重看次数（几刷）</label><input id="entertainmentWorkRewatch" type="number" min="1" value="1" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+    <div id="entertainmentEpisodeFields" class="grid grid-cols-2 gap-2 mb-3"><div><label class="text-xs text-slate-400">总集数</label><input id="entertainmentWorkEpisodes" type="number" min="0" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div><div><label class="text-xs text-slate-400">当前进度</label><input id="entertainmentWorkCurrent" type="number" min="0" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div></div>
+    <label class="text-xs text-slate-400">封面图片</label><input id="entertainmentWorkCover" type="file" accept="image/*" class="w-full text-xs text-slate-500 mb-4">
+    <div class="flex justify-end gap-2"><button onclick="closeEntertainmentWorkModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button><button onclick="saveEntertainmentWork()" class="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-600 text-white rounded-lg">保存</button></div>
+</div></div>
+<div id="entertainmentSettingsModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-lg modal-enter max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-semibold">娱乐设置</h3><button onclick="closeEntertainmentSettings()" class="text-slate-400 text-xl">✕</button></div>
+    <label class="flex items-center gap-2 text-sm mb-4"><input id="entertainmentProgressToggle" type="checkbox" onchange="toggleEntertainmentProgress(this.checked)"> 开启在追作品集数进度</label>
+    <div class="border-t border-slate-100 pt-4"><h4 class="text-sm font-semibold text-slate-700 mb-3">大分类</h4><div class="flex gap-2 mb-3"><input id="entertainmentCategoryName" class="input-focus flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50" placeholder="新增大分类"><button onclick="addEntertainmentCategory()" class="bg-primary-50 text-primary-600 px-3 rounded-lg">添加</button></div><div id="entertainmentCategoryList" class="space-y-2"></div></div>
+    <div class="border-t border-slate-100 pt-4 mt-4"><h4 class="text-sm font-semibold text-slate-700 mb-3">小分类</h4><div class="flex gap-2 mb-3"><select id="entertainmentSubcategoryParent" class="input-focus px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select><input id="entertainmentSubcategoryName" class="input-focus flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50" placeholder="新增小分类"><button onclick="addEntertainmentSubcategory()" class="bg-primary-50 text-primary-600 px-3 rounded-lg">添加</button></div><div id="entertainmentSubcategoryList" class="space-y-2"></div></div>
+</div></div>
+<div id="entertainmentRandomModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-lg modal-enter"><h3 class="text-lg font-semibold mb-4">随机抽取</h3><div class="grid grid-cols-3 gap-2 mb-4"><select id="entertainmentRandomScope" onchange="updateEntertainmentRandomOptions()" class="input-focus px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"><option value="all">全部作品</option><option value="category">大分类</option><option value="subcategory">小分类</option></select><select id="entertainmentRandomFilter" class="input-focus px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></select><input id="entertainmentRandomCount" type="number" min="1" value="1" class="input-focus px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div><div class="flex justify-end gap-2 mb-4"><button onclick="closeEntertainmentRandomModal()" class="px-4 py-2 text-sm text-slate-500">关闭</button><button onclick="drawEntertainmentRandomWorks()" class="px-4 py-2 text-sm bg-amber-500 text-white rounded-lg">抽取</button></div><div id="entertainmentRandomResults" class="grid grid-cols-3 gap-3"></div></div></div>
+<!-- v7 事件标记模态框：单天标记 -->
+<div id="eventMarkerModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="eventMarkerModalTitle" class="text-lg font-semibold mb-4">新增事件标记</h3>
+    <input type="hidden" id="eventMarkerPresetDate" value="">
+    <label class="text-xs text-slate-400">日期</label>
+    <input id="eventMarkerDate" type="date" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400">说明文字</label>
+    <input id="eventMarkerText" type="text" placeholder="如：期中考试、家长会…" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400 mb-1 block">颜色</label>
+    <div id="eventMarkerColors" class="grid grid-cols-8 gap-1.5 mb-4"></div>
+    <div class="flex gap-2 justify-end flex-wrap">
+        <button onclick="closeEventMarkerModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="eventMarkerDeleteBtn" onclick="deleteEventMarker()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveEventMarker()" class="px-4 py-2 text-sm bg-rose-500 hover:bg-rose-600 text-white rounded-lg">保存</button>
+    </div>
+</div></div>
+<!-- v7 整体(区间)标记模态框 -->
+<div id="blockMarkerModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm modal-enter">
+    <h3 id="blockMarkerModalTitle" class="text-lg font-semibold mb-4">新增整体标记</h3>
+    <input type="hidden" id="blockMarkerPresetDate" value="">
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <div><label class="text-xs text-slate-400">开始日期</label><input id="blockMarkerStart" type="date" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+        <div><label class="text-xs text-slate-400">结束日期</label><input id="blockMarkerEnd" type="date" class="input-focus w-full px-2 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50"></div>
+    </div>
+    <label class="text-xs text-slate-400">说明文字</label>
+    <input id="blockMarkerText" type="text" placeholder="如：期中考试周、国庆假期…" class="input-focus w-full px-3 py-2 text-sm border border-slate-200 rounded-lg mb-3 bg-slate-50">
+    <label class="text-xs text-slate-400 mb-1 block">颜色</label>
+    <div id="blockMarkerColors" class="grid grid-cols-8 gap-1.5 mb-4"></div>
+    <div class="flex gap-2 justify-end flex-wrap">
+        <button onclick="closeBlockMarkerModal()" class="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">取消</button>
+        <button id="blockMarkerDeleteBtn" onclick="deleteBlockMarker()" class="hidden px-4 py-2 text-sm bg-red-50 text-red-500 hover:bg-red-100 rounded-lg">删除</button>
+        <button onclick="saveBlockMarker()" class="px-4 py-2 text-sm bg-violet-500 hover:bg-violet-600 text-white rounded-lg">保存</button>
+    </div>
+</div></div>
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-sm px-4 py-2 rounded-lg z-[200]"></div>
+
+</body>
+</html>
